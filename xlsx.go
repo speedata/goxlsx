@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"path"
 	"strconv"
 )
 
@@ -260,7 +259,7 @@ func (s *Spreadsheet) GetWorksheet(number int) (*Worksheet, error) {
 		return nil, errors.New("Index out of range")
 	}
 	ws := s.Worksheets[number]
-	ws.filename = path.Join("xl/worksheets", fmt.Sprintf("sheet%s.xml", ws.id))
+	ws.filename = "xl/worksheets" + "/" + fmt.Sprintf("sheet%s.xml", ws.id)
 	err := ws.readWorksheetZIP()
 	if err != nil {
 		return nil, err
