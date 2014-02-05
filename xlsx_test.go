@@ -27,10 +27,10 @@ func TestOpenFile(t *testing.T) {
 
 	row := ws.rows[1]
 	if row.Cells[1].Value != "A" {
-		t.Error("First value shoudl be A")
+		t.Error("First value should be A")
 	}
 	if row.Cells[2].Value != "B" {
-		t.Error("Second value shoudl be B")
+		t.Error("Second value should be B")
 	}
 	if ws.Cell(1, 1) != "A" {
 		t.Error("1,1 should be A")

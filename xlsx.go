@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"strings"
 )
 
 type Worksheet struct {
@@ -193,7 +194,10 @@ func readWorksheetXML(dec *xml.Decoder, s *Spreadsheet) (map[int]*row, error) {
 					case "t":
 						if a.Value == "s" {
 							currentCell.Type = "s"
+						} else if a.Value == "n" {
+							currentCell.Type = "n"
 						}
+
 					}
 
 				}
@@ -210,6 +214,8 @@ func readWorksheetXML(dec *xml.Decoder, s *Spreadsheet) (map[int]*row, error) {
 				if currentCell.Type == "s" {
 					valInt, _ := strconv.Atoi(val)
 					currentCell.Value = s.sharedStrings[valInt]
+				} else if currentCell.Type == "n" {
+					currentCell.Value = strings.TrimSuffix(val, ".0")
 				} else {
 					currentCell.Value = val
 				}
