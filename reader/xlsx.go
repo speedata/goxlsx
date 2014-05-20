@@ -1,4 +1,6 @@
-package goxlsx
+// Excel file reader for go.
+// Support for reading files in the Excel 2007 format (.xlsx) is included.
+package reader
 
 import (
 	"archive/zip"

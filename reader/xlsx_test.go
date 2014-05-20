@@ -1,4 +1,4 @@
-package goxlsx
+package reader
 
 import (
 	"path/filepath"
@@ -10,7 +10,7 @@ func TestOpenFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(xlsx.Worksheets) != 2 {
+	if len(xlsx.worksheets) != 2 {
 		t.Error("num of worksheets != 2")
 	}
 
