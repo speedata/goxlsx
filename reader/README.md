@@ -38,6 +38,7 @@ Other:
 -----
 
 Status: usable<br>
+Maturity level: 1/5 (expect changes!)
 Supported/maintained: yes<br>
 Contribution welcome: yes (pull requests, issues)<br>
 Main page: https://github.com/speedata/goxlsx<br>
