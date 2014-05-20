@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -33,7 +34,7 @@ type row struct {
 type Spreadsheet struct {
 	filepath        string
 	compressedFiles []zip.File
-	Worksheets      []*Worksheet
+	worksheets      []*Worksheet
 	sharedStrings   []string
 }
 
@@ -116,6 +117,7 @@ func readStrings(d *xml.Decoder, s *Spreadsheet) {
 	}
 }
 
+// Read the Excel file located at the given path.
 func OpenFile(path string) (*Spreadsheet, error) {
 	xlsx := new(Spreadsheet)
 	xlsx.filepath = path
@@ -132,7 +134,7 @@ func OpenFile(path string) (*Spreadsheet, error) {
 			if err != nil {
 				return nil, err
 			}
-			xlsx.Worksheets = readWorkbook(xml.NewDecoder(rc), xlsx)
+			xlsx.worksheets = readWorkbook(xml.NewDecoder(rc), xlsx)
 			rc.Close()
 		}
 		if f.Name == "xl/sharedStrings.xml" {
@@ -249,6 +251,8 @@ func (ws *Worksheet) readWorksheetZIP() error {
 	return nil
 }
 
+// Get the contents of cell at row / column, where 1,1 is the top left corner. The return value is always a string.
+// The user is in charge to convert this value to a number, if necessary. Formulae are not returned.
 func (ws *Worksheet) Cell(row, column int) string {
 	xrow := ws.rows[row]
 	if xrow == nil {
@@ -260,12 +264,13 @@ func (ws *Worksheet) Cell(row, column int) string {
 	return xrow.Cells[column].Value
 }
 
+// Get the worksheet with the given number, starting at 0.
 func (s *Spreadsheet) GetWorksheet(number int) (*Worksheet, error) {
-	if number >= len(s.Worksheets) || number < 0 {
+	if number >= len(s.worksheets) || number < 0 {
 		return nil, errors.New("Index out of range")
 	}
-	ws := s.Worksheets[number]
-	ws.filename = "xl/worksheets" + "/" + fmt.Sprintf("sheet%s.xml", ws.id)
+	ws := s.worksheets[number]
+	ws.filename = path.Join("xl", "worksheets", fmt.Sprintf("sheet%s.xml", ws.id))
 	err := ws.readWorksheetZIP()
 	if err != nil {
 		return nil, err
