@@ -14,6 +14,10 @@ import (
 
 type Worksheet struct {
 	Name        string
+	MaxRow      int
+	MaxColumn   int
+	MinRow      int
+	MinColumn   int
 	filename    string
 	id          string
 	rows        map[int]*row
@@ -149,7 +153,22 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	return xlsx, nil
 }
 
-func readWorksheetXML(dec *xml.Decoder, s *Spreadsheet) (map[int]*row, error) {
+// excelpos is something like "AC101"
+func stringToPosition(excelpos string) (int, int) {
+	var columnnumber, rownumber rune
+	for _, v := range excelpos {
+		if v >= 'A' && v <= 'Z' {
+			columnnumber = columnnumber*26 + v - 'A' + 1
+		}
+		if v >= '0' && v <= '9' {
+			rownumber = rownumber*10 + v - '0'
+		}
+	}
+	return int(columnnumber), int(rownumber)
+}
+
+func (ws *Worksheet) readWorksheetXML(dec *xml.Decoder) (map[int]*row, error) {
+	sharedStrings := ws.spreadsheet.sharedStrings
 	rows := make(map[int]*row)
 	var (
 		err         error
@@ -169,6 +188,15 @@ func readWorksheetXML(dec *xml.Decoder, s *Spreadsheet) (map[int]*row, error) {
 		switch x := token.(type) {
 		case xml.StartElement:
 			switch x.Name.Local {
+			case "dimension":
+				for _, a := range x.Attr {
+					if a.Name.Local == "ref" {
+						// example: ref="A1:AC101"
+						tmp := strings.Split(a.Value, ":")
+						ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
+						ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+					}
+				}
 			case "row":
 				currentRow = &row{}
 				currentRow.Cells = make(map[int]*cell)
@@ -215,7 +243,7 @@ func readWorksheetXML(dec *xml.Decoder, s *Spreadsheet) (map[int]*row, error) {
 				val := string(x.Copy())
 				if currentCell.Type == "s" {
 					valInt, _ := strconv.Atoi(val)
-					currentCell.Value = s.sharedStrings[valInt]
+					currentCell.Value = sharedStrings[valInt]
 				} else if currentCell.Type == "n" {
 					currentCell.Value = strings.TrimSuffix(val, ".0")
 				} else {
@@ -241,7 +269,7 @@ func (ws *Worksheet) readWorksheetZIP() error {
 				return err
 			}
 			defer rc.Close()
-			rows, err := readWorksheetXML(xml.NewDecoder(rc), ws.spreadsheet)
+			rows, err := ws.readWorksheetXML(xml.NewDecoder(rc))
 			ws.rows = rows
 			if err != nil {
 				return err
@@ -251,9 +279,9 @@ func (ws *Worksheet) readWorksheetZIP() error {
 	return nil
 }
 
-// Get the contents of cell at row / column, where 1,1 is the top left corner. The return value is always a string.
+// Get the contents of cell at column, row, where 1,1 is the top left corner. The return value is always a string.
 // The user is in charge to convert this value to a number, if necessary. Formulae are not returned.
-func (ws *Worksheet) Cell(row, column int) string {
+func (ws *Worksheet) Cell(column, row int) string {
 	xrow := ws.rows[row]
 	if xrow == nil {
 		return ""
