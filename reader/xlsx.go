@@ -7,23 +7,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"path"
 	"strconv"
 	"strings"
 )
 
 // Represent a worksheet in an excel file. A worksheet is a rectangular area of cells, each cell can contain a value.
 type Worksheet struct {
-	Name        string
-	MaxRow      int
-	MaxColumn   int
-	MinRow      int
-	MinColumn   int
-	filename    string
-	id          string
-	rows        map[int]*row
-	spreadsheet *Spreadsheet
+	Name          string
+	MaxRow        int
+	MaxColumn     int
+	MinRow        int
+	MinColumn     int
+	NumWorksheets int
+	filename      string
+	id            string
+	rows          map[int]*row
+	spreadsheet   *Spreadsheet
 }
 
 type cell struct {
@@ -39,95 +38,47 @@ type row struct {
 
 // A spreadsheet represents the .xlsx file.
 type Spreadsheet struct {
-	filepath        string
-	compressedFiles []zip.File
-	worksheets      []*Worksheet
-	sharedStrings   []string
+	filepath          string
+	compressedFiles   []zip.File
+	worksheets        []*Worksheet
+	NumWorksheets     int
+	sharedStrings     []string
+	uncompressedFiles map[string][]byte
 }
 
-func readWorkbook(d *xml.Decoder, s *Spreadsheet) []*Worksheet {
-	worksheets := make([]*Worksheet, 0, 5)
-	var (
-		err   error
-		token xml.Token
-	)
-
-	for {
-		token, err = d.Token()
-		if err != nil {
-			if err != io.EOF {
-				log.Fatal(err)
-			}
-			break
-		}
-		switch x := token.(type) {
-		case xml.StartElement:
-			switch x.Name.Local {
-			case "sheet":
-				ws := new(Worksheet)
-				ws.spreadsheet = s
-				for _, a := range x.Attr {
-					if a.Name.Local == "name" {
-						ws.Name = a.Value
-					}
-					if a.Name.Local == "sheetId" {
-						ws.id = a.Value
-					}
-				}
-				worksheets = append(worksheets, ws)
-			}
-		}
+func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
+	wb := &workbook{}
+	err := xml.Unmarshal(data, wb)
+	if err != nil {
+		return nil, err
 	}
-	return worksheets
+	var worksheets []*Worksheet
+
+	for i := 0; i < len(wb.Sheets); i++ {
+		w := &Worksheet{}
+		w.spreadsheet = s
+		w.Name = wb.Sheets[i].Name
+		w.id = wb.Sheets[i].SheetId
+		worksheets = append(worksheets, w)
+	}
+	return worksheets, nil
 }
 
-func readStrings(d *xml.Decoder, s *Spreadsheet) {
-	var (
-		err   error
-		data  []byte
-		token xml.Token
-	)
-	for {
-		token, err = d.Token()
-		if err != nil {
-			if err != io.EOF {
-				log.Fatal(err)
-			}
-			break
-		}
-		switch x := token.(type) {
-		case xml.StartElement:
-			switch x.Name.Local {
-			case "sst":
-				// root element
-				for i := 0; i < len(x.Attr); i++ {
-					if x.Attr[i].Name.Local == "uniqueCount" {
-						count, err := strconv.Atoi(x.Attr[i].Value)
-						if err != nil {
-							log.Fatal(err)
-						}
-						s.sharedStrings = make([]string, 0, count)
-					}
-				}
-			default:
-				// log.Println(x.Name.Local)
-			}
-		case xml.CharData:
-			data = x.Copy()
-		case xml.EndElement:
-			switch x.Name.Local {
-			case "t":
-				s.sharedStrings = append(s.sharedStrings, string(data))
-			}
-		}
-
+func readStrings(data []byte) []string {
+	sst := &sst{}
+	xml.Unmarshal(data, sst)
+	ret := make([]string, sst.UniqueCount)
+	for i := 0; i < sst.UniqueCount; i++ {
+		ret[i] = sst.Si[i].T
 	}
+	return ret
 }
 
 // OpenFile reads a file located at the given path and returns a spreadsheet object.
 func OpenFile(path string) (*Spreadsheet, error) {
 	xlsx := new(Spreadsheet)
 	xlsx.filepath = path
+	xlsx.uncompressedFiles = make(map[string][]byte)
 
 	r, err := zip.OpenReader(path)
 	if err != nil {
@@ -136,23 +87,36 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	defer r.Close()
 
 	for _, f := range r.File {
-		if f.Name == "xl/workbook.xml" {
-			rc, err := f.Open()
-			if err != nil {
+		buf := make([]byte, f.UncompressedSize64)
+		rc, err := f.Open()
+		if err != nil {
+			return nil, err
+		}
+		pos := 0
+	readfile:
+		for {
+			size, err := rc.Read(buf[pos:])
+			if err == io.EOF {
+				// ok, fine
+				break readfile
+			} else if err != nil {
 				return nil, err
 			}
-			xlsx.worksheets = readWorkbook(xml.NewDecoder(rc), xlsx)
-			rc.Close()
+			pos += size
 		}
-		if f.Name == "xl/sharedStrings.xml" {
-			rc, err := f.Open()
-			if err != nil {
-				return nil, err
-			}
-			readStrings(xml.NewDecoder(rc), xlsx)
-			rc.Close()
+		if pos != int(f.UncompressedSize64) {
+			return nil, errors.New(fmt.Sprintf("read (%d) not equal to uncompressed size (%d)", pos, f.UncompressedSize64))
 		}
+
+		xlsx.uncompressedFiles[f.Name] = buf
 	}
+	xlsx.worksheets, err = readWorkbook(xlsx.uncompressedFiles["xl/workbook.xml"], xlsx)
+	if err != nil {
+		return nil, err
+	}
+	xlsx.NumWorksheets = len(xlsx.worksheets)
+	xlsx.sharedStrings = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
+
 	return xlsx, nil
 }
 
@@ -170,118 +134,6 @@ func stringToPosition(excelpos string) (int, int) {
 	return int(columnnumber), int(rownumber)
 }
 
-func (ws *Worksheet) readWorksheetXML(dec *xml.Decoder) (map[int]*row, error) {
-	sharedStrings := ws.spreadsheet.sharedStrings
-	rows := make(map[int]*row)
-	var (
-		err         error
-		token       xml.Token
-		rownum      int
-		currentCell *cell
-		currentRow  *row
-	)
-	for {
-		token, err = dec.Token()
-		if err != nil {
-			if err != io.EOF {
-				return nil, err
-			}
-			break
-		}
-		switch x := token.(type) {
-		case xml.StartElement:
-			switch x.Name.Local {
-			case "dimension":
-				for _, a := range x.Attr {
-					if a.Name.Local == "ref" {
-						// example: ref="A1:AC101"
-						tmp := strings.Split(a.Value, ":")
-						ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
-						ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
-					}
-				}
-			case "row":
-				currentRow = &row{}
-				currentRow.Cells = make(map[int]*cell)
-				for _, a := range x.Attr {
-					if a.Name.Local == "r" {
-						rownum, err = strconv.Atoi(a.Value)
-						if err != nil {
-							return nil, err
-						}
-					}
-				}
-				currentRow.Num = rownum
-				rows[rownum] = currentRow
-			case "c":
-				currentCell = &cell{}
-				var cellnumber rune
-				for _, a := range x.Attr {
-					switch a.Name.Local {
-					case "r":
-						for _, v := range a.Value {
-							if v >= 'A' && v <= 'Z' {
-								cellnumber = cellnumber*26 + v - 'A' + 1
-							}
-						}
-					case "t":
-						if a.Value == "s" {
-							currentCell.Type = "s"
-						} else if a.Value == "n" {
-							currentCell.Type = "n"
-						}
-
-					}
-
-				}
-				currentRow.Cells[int(cellnumber)] = currentCell
-			}
-		case xml.EndElement:
-			switch x.Name.Local {
-			case "c":
-				currentCell = nil
-			}
-		case xml.CharData:
-			if currentCell != nil {
-				val := string(x.Copy())
-				if currentCell.Type == "s" {
-					valInt, _ := strconv.Atoi(val)
-					currentCell.Value = sharedStrings[valInt]
-				} else if currentCell.Type == "n" {
-					currentCell.Value = strings.TrimSuffix(val, ".0")
-				} else {
-					currentCell.Value = val
-				}
-			}
-		}
-	}
-	return rows, nil
-}
-
-func (ws *Worksheet) readWorksheetZIP() error {
-	r, err := zip.OpenReader(ws.spreadsheet.filepath)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
-	for _, f := range r.File {
-		if f.Name == ws.filename {
-			rc, err := f.Open()
-			if err != nil {
-				return err
-			}
-			defer rc.Close()
-			rows, err := ws.readWorksheetXML(xml.NewDecoder(rc))
-			ws.rows = rows
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // Cell returns the contents of cell at column, row, where 1,1 is the top left corner. The return value is always a string.
 // The user is in charge to convert this value to a number, if necessary. Formulae are not returned.
 func (ws *Worksheet) Cell(column, row int) string {
@@ -295,14 +147,66 @@ func (ws *Worksheet) Cell(column, row int) string {
 	return xrow.Cells[column].Value
 }
 
+func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
+	ws_xlsx := &xlsx_worksheet{}
+	err := xml.Unmarshal(data, ws_xlsx)
+	if err != nil {
+		return nil, err
+	}
+	ws := &Worksheet{}
+	ws.rows = make(map[int]*row)
+	tmp := strings.Split(ws_xlsx.Dimension.Ref, ":")
+	ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
+	ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+
+	var currentRow *row
+
+	for xrow := 0; xrow < len(ws_xlsx.Row); xrow++ {
+		thisrow := ws_xlsx.Row[xrow]
+
+		currentRow = &row{}
+		currentRow.Cells = make(map[int]*cell)
+		currentRow.Num = thisrow.Rownumber
+		ws.rows[thisrow.Rownumber] = currentRow
+
+		for col := 0; col < len(thisrow.Cols); col++ {
+			var cellnumber rune
+			thiscol := thisrow.Cols[col]
+			for _, v := range thiscol.R {
+				if v >= 'A' && v <= 'Z' {
+					cellnumber = cellnumber*26 + v - 'A' + 1
+				}
+			}
+			currentCell := &cell{}
+
+			currentRow.Cells[int(cellnumber)] = currentCell
+
+			if thiscol.T == "s" {
+				v, err := strconv.Atoi(thiscol.V)
+				if err != nil {
+					return nil, err
+				}
+				currentCell.Value = s.sharedStrings[v]
+				currentCell.Type = "s"
+			} else if thiscol.T == "" {
+				currentCell.Type = "v"
+				currentCell.Value = thiscol.V
+			}
+
+		}
+	}
+
+	return ws, nil
+}
+
 // GetWorksheet returns the worksheet with the given number, starting at 0.
 func (s *Spreadsheet) GetWorksheet(number int) (*Worksheet, error) {
 	if number >= len(s.worksheets) || number < 0 {
 		return nil, errors.New("index out of range")
 	}
-	ws := s.worksheets[number]
-	ws.filename = path.Join("xl", "worksheets", fmt.Sprintf("sheet%s.xml", ws.id))
-	err := ws.readWorksheetZIP()
+	filename := fmt.Sprintf("xl/worksheets/sheet%s.xml", s.worksheets[number].id)
+	ws, err := s.readWorksheet(s.uncompressedFiles[filename])
+
 	if err != nil {
 		return nil, err
 	}
