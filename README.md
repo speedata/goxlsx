@@ -15,13 +15,13 @@ package main
 
 import (
     "fmt"
-    "github.com/speedata/goxlsx/reader"
+    "github.com/speedata/goxlsx"
     "log"
 )
 
 func main() {
     excelfile := "Worksheet1.xlsx"
-    spreadsheet, err := reader.OpenFile(excelfile)
+    spreadsheet, err := goxlsx.OpenFile(excelfile)
     if err != nil {
         log.Fatal(err)
     }

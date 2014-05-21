@@ -1,5 +1,5 @@
-// Package reader accesses Excel 2007 (.xslx) for reading.
-package reader
+// Package goxlsx accesses Excel 2007 (.xslx) for reading.
+package goxlsx
 
 import (
 	"archive/zip"
@@ -195,7 +195,6 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 
 		}
 	}
-
 	return ws, nil
 }
 
@@ -206,7 +205,7 @@ func (s *Spreadsheet) GetWorksheet(number int) (*Worksheet, error) {
 	}
 	filename := fmt.Sprintf("xl/worksheets/sheet%s.xml", s.worksheets[number].id)
 	ws, err := s.readWorksheet(s.uncompressedFiles[filename])
-
+	ws.filename = filename
 	if err != nil {
 		return nil, err
 	}

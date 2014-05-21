@@ -1,4 +1,4 @@
-package reader
+package goxlsx
 
 import (
 	"encoding/xml"

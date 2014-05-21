@@ -1,4 +1,4 @@
-package reader
+package goxlsx
 
 import (
 	"path/filepath"
@@ -19,7 +19,7 @@ func TestOpenFile(t *testing.T) {
 		t.Error(err)
 	}
 	if ws.filename != "xl/worksheets/sheet1.xml" {
-		t.Error("filename mismatch")
+		t.Error("filename mismatch, got", ws.filename)
 	}
 	if len(ws.rows) != 5 {
 		t.Error("ws.rows != 5")
