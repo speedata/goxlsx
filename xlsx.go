@@ -11,7 +11,8 @@ import (
 	"strings"
 )
 
-// Represent a worksheet in an excel file. A worksheet is a rectangular area of cells, each cell can contain a value.
+// Worksheet represents a single worksheet in an excel file.
+// A worksheet is a rectangular area of cells, each cell can contain a value.
 type Worksheet struct {
 	Name          string
 	MaxRow        int
@@ -36,14 +37,18 @@ type row struct {
 	Cells map[int]*cell
 }
 
-// A spreadsheet represents the .xlsx file.
+// Spreadsheet represents the whole .xlsx file.
 type Spreadsheet struct {
 	filepath          string
 	compressedFiles   []zip.File
 	worksheets        []*Worksheet
-	NumWorksheets     int
 	sharedStrings     []string
 	uncompressedFiles map[string][]byte
+}
+
+// NumWorksheets returns the number of worksheets in a file.
+func (s *Spreadsheet) NumWorksheets() int {
+	return len(s.worksheets)
 }
 
 func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
@@ -58,7 +63,7 @@ func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
 		w := &Worksheet{}
 		w.spreadsheet = s
 		w.Name = wb.Sheets[i].Name
-		w.id = wb.Sheets[i].SheetId
+		w.id = wb.Sheets[i].SheetID
 		worksheets = append(worksheets, w)
 	}
 	return worksheets, nil
@@ -105,7 +110,7 @@ func OpenFile(path string) (*Spreadsheet, error) {
 			pos += size
 		}
 		if pos != int(f.UncompressedSize64) {
-			return nil, errors.New(fmt.Sprintf("read (%d) not equal to uncompressed size (%d)", pos, f.UncompressedSize64))
+			return nil, fmt.Errorf("read (%d) not equal to uncompressed size (%d)", pos, f.UncompressedSize64)
 		}
 
 		xlsx.uncompressedFiles[f.Name] = buf
@@ -114,7 +119,6 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	xlsx.NumWorksheets = len(xlsx.worksheets)
 	xlsx.sharedStrings = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
 
 	return xlsx, nil
@@ -148,21 +152,21 @@ func (ws *Worksheet) Cell(column, row int) string {
 }
 
 func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
-	ws_xlsx := &xlsx_worksheet{}
-	err := xml.Unmarshal(data, ws_xlsx)
+	wsXlsx := &xlsxWorksheet{}
+	err := xml.Unmarshal(data, wsXlsx)
 	if err != nil {
 		return nil, err
 	}
 	ws := &Worksheet{}
 	ws.rows = make(map[int]*row)
-	tmp := strings.Split(ws_xlsx.Dimension.Ref, ":")
+	tmp := strings.Split(wsXlsx.Dimension.Ref, ":")
 	ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
 	ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
 
 	var currentRow *row
 
-	for xrow := 0; xrow < len(ws_xlsx.Row); xrow++ {
-		thisrow := ws_xlsx.Row[xrow]
+	for xrow := 0; xrow < len(wsXlsx.Row); xrow++ {
+		thisrow := wsXlsx.Row[xrow]
 
 		currentRow = &row{}
 		currentRow.Cells = make(map[int]*cell)

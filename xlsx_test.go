@@ -10,7 +10,7 @@ func TestOpenFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(xlsx.worksheets) != 2 {
+	if xlsx.NumWorksheets() != 2 {
 		t.Error("num of worksheets != 2")
 	}
 

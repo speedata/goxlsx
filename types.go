@@ -6,7 +6,7 @@ import (
 
 type sheet struct {
 	Name    string `xml:"name,attr"`
-	SheetId string `xml:"sheetId,attr"`
+	SheetID string `xml:"sheetId,attr"`
 	Rid     string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
 }
 type workbook struct {
@@ -24,23 +24,23 @@ type sst struct {
 	Si          []si     `xml:"si"`
 }
 
-type xlsx_column struct {
+type xlsxColumn struct {
 	R    string `xml:"r,attr"`
 	T    string `xml:"t,attr"`
 	V    string `xml:"v"`
 	Text string `xml:"is>t"`
 }
 type xlsx_row struct {
-	Rownumber int           `xml:"r,attr"`
-	Cols      []xlsx_column `xml:"c"`
+	Rownumber int          `xml:"r,attr"`
+	Cols      []xlsxColumn `xml:"c"`
 }
 
-type xslx_dimension struct {
+type xslxDimension struct {
 	Ref string `xml:"ref,attr"`
 }
 
-type xlsx_worksheet struct {
-	XMLName   xml.Name       `xml:"http://schemas.openxmlformats.org/spreadsheetml/2006/main worksheet"`
-	Dimension xslx_dimension `xml:"dimension"`
-	Row       []xlsx_row     `xml:"sheetData>row"`
+type xlsxWorksheet struct {
+	XMLName   xml.Name      `xml:"http://schemas.openxmlformats.org/spreadsheetml/2006/main worksheet"`
+	Dimension xslxDimension `xml:"dimension"`
+	Row       []xlsx_row    `xml:"sheetData>row"`
 }
