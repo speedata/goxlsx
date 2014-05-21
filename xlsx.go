@@ -14,16 +14,15 @@ import (
 // Worksheet represents a single worksheet in an excel file.
 // A worksheet is a rectangular area of cells, each cell can contain a value.
 type Worksheet struct {
-	Name          string
-	MaxRow        int
-	MaxColumn     int
-	MinRow        int
-	MinColumn     int
-	NumWorksheets int
-	filename      string
-	id            string
-	rows          map[int]*row
-	spreadsheet   *Spreadsheet
+	Name        string
+	MaxRow      int
+	MaxColumn   int
+	MinRow      int
+	MinColumn   int
+	filename    string
+	id          string
+	rows        map[int]*row
+	spreadsheet *Spreadsheet
 }
 
 type cell struct {

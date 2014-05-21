@@ -30,7 +30,7 @@ type xlsxColumn struct {
 	V    string `xml:"v"`
 	Text string `xml:"is>t"`
 }
-type xlsx_row struct {
+type xlsxRow struct {
 	Rownumber int          `xml:"r,attr"`
 	Cols      []xlsxColumn `xml:"c"`
 }
@@ -42,5 +42,5 @@ type xslxDimension struct {
 type xlsxWorksheet struct {
 	XMLName   xml.Name      `xml:"http://schemas.openxmlformats.org/spreadsheetml/2006/main worksheet"`
 	Dimension xslxDimension `xml:"dimension"`
-	Row       []xlsx_row    `xml:"sheetData>row"`
+	Row       []xlsxRow     `xml:"sheetData>row"`
 }
