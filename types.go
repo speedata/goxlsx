@@ -44,3 +44,19 @@ type xlsxWorksheet struct {
 	Dimension xslxDimension `xml:"dimension"`
 	Row       []xlsxRow     `xml:"sheetData>row"`
 }
+
+type xslxRelationship struct {
+	Id     string `xml:"Id,attr"`
+	Type   string `xml:"Type,attr"`
+	Target string `xml:"Target,attr"`
+}
+
+type xslxRelationships struct {
+	XMLName      xml.Name `xml:"http://schemas.openxmlformats.org/package/2006/relationships Relationships"`
+	Relationship []xslxRelationship
+}
+
+type relationship struct {
+	Type   string `xml:"Type,attr"`
+	Target string `xml:"Target,attr"`
+}

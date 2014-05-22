@@ -21,6 +21,7 @@ type Worksheet struct {
 	MinColumn   int
 	filename    string
 	id          string
+	rid         string
 	rows        map[int]*row
 	spreadsheet *Spreadsheet
 }
@@ -43,6 +44,7 @@ type Spreadsheet struct {
 	worksheets        []*Worksheet
 	sharedStrings     []string
 	uncompressedFiles map[string][]byte
+	relationships     map[string]relationship
 }
 
 // NumWorksheets returns the number of worksheets in a file.
@@ -56,6 +58,7 @@ func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var worksheets []*Worksheet
 
 	for i := 0; i < len(wb.Sheets); i++ {
@@ -63,6 +66,7 @@ func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
 		w.spreadsheet = s
 		w.Name = wb.Sheets[i].Name
 		w.id = wb.Sheets[i].SheetID
+		w.rid = wb.Sheets[i].Rid
 		worksheets = append(worksheets, w)
 	}
 	return worksheets, nil
@@ -114,6 +118,10 @@ func OpenFile(path string) (*Spreadsheet, error) {
 
 		xlsx.uncompressedFiles[f.Name] = buf
 	}
+	xlsx.relationships, err = readRelationships(xlsx.uncompressedFiles["xl/_rels/workbook.xml.rels"])
+	if err != nil {
+		return nil, err
+	}
 	xlsx.worksheets, err = readWorkbook(xlsx.uncompressedFiles["xl/workbook.xml"], xlsx)
 	if err != nil {
 		return nil, err
@@ -121,6 +129,19 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	xlsx.sharedStrings = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
 
 	return xlsx, nil
+}
+
+func readRelationships(data []byte) (map[string]relationship, error) {
+	rels := &xslxRelationships{}
+	err := xml.Unmarshal(data, rels)
+	if err != nil {
+		return nil, err
+	}
+	ret := make(map[string]relationship)
+	for _, v := range rels.Relationship {
+		ret[v.Id] = relationship{Type: v.Type, Target: v.Target}
+	}
+	return ret, nil
 }
 
 // excelpos is something like "AC101"
@@ -206,9 +227,11 @@ func (s *Spreadsheet) GetWorksheet(number int) (*Worksheet, error) {
 	if number >= len(s.worksheets) || number < 0 {
 		return nil, errors.New("index out of range")
 	}
-	filename := fmt.Sprintf("xl/worksheets/sheet%s.xml", s.worksheets[number].id)
+	rid := s.worksheets[number].rid
+	filename := "xl/" + s.relationships[rid].Target
 	ws, err := s.readWorksheet(s.uncompressedFiles[filename])
 	ws.filename = filename
+	ws.Name = s.worksheets[number].Name
 	if err != nil {
 		return nil, err
 	}
