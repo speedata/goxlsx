@@ -171,6 +171,23 @@ func (ws *Worksheet) Cell(column, row int) string {
 	return xrow.Cells[column].Value
 }
 
+// Cell returns the contents of cell at column, row, where 1,1 is the top left corner.
+// The return value is always a float64 and an error code != nil if the cell contents can't be
+// decoded as a float.
+func (ws *Worksheet) Cellf(column, row int) (float64, error) {
+	var tmpstr string
+	xrow := ws.rows[row]
+	if xrow == nil {
+		return 0, errors.New("Not a float")
+	}
+	if xrow.Cells[column] == nil {
+		return 0, errors.New("Not a float")
+	}
+	tmpstr = xrow.Cells[column].Value
+	flt, err := strconv.ParseFloat(tmpstr, 64)
+	return flt, err
+}
+
 func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 	wsXlsx := &xlsxWorksheet{}
 	err := xml.Unmarshal(data, wsXlsx)

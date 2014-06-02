@@ -35,5 +35,8 @@ func TestOpenFile(t *testing.T) {
 	if ws.Cell(1, 1) != "A" {
 		t.Error("1,1 should be A")
 	}
+	if f, err := ws.Cellf(4, 2); f != 4.0 || err != nil {
+		t.Error("4,2 should be 4.0")
+	}
 
 }
