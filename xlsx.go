@@ -3,6 +3,7 @@ package goxlsx
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -154,53 +155,94 @@ func (ws *Worksheet) Cellf(column, row int) (float64, error) {
 }
 
 func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
-	wsXlsx := &xlsxWorksheet{}
-	err := xml.Unmarshal(data, wsXlsx)
-	if err != nil {
-		return nil, err
-	}
+	r := bytes.NewReader(data)
+	dec := xml.NewDecoder(r)
 	ws := &Worksheet{}
-	ws.rows = make(map[int]*row)
-	tmp := strings.Split(wsXlsx.Dimension.Ref, ":")
-	ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
-	ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+	rows := make(map[int]*row)
 
-	var currentRow *row
+	var (
+		err         error
+		token       xml.Token
+		rownum      int
+		currentCell *cell
+		currentRow  *row
+	)
+	for {
+		token, err = dec.Token()
+		if err != nil {
+			if err != io.EOF {
+				return nil, err
+			}
+			break
+		}
+		switch x := token.(type) {
+		case xml.StartElement:
+			switch x.Name.Local {
+			case "dimension":
+				for _, a := range x.Attr {
+					if a.Name.Local == "ref" {
+						// example: ref="A1:AC101"
+						tmp := strings.Split(a.Value, ":")
+						ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
+						ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+					}
+				}
+			case "row":
+				currentRow = &row{}
+				currentRow.Cells = make(map[int]*cell)
+				for _, a := range x.Attr {
+					if a.Name.Local == "r" {
+						rownum, err = strconv.Atoi(a.Value)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+				currentRow.Num = rownum
+				rows[rownum] = currentRow
+			case "c":
+				currentCell = &cell{}
+				var cellnumber rune
+				for _, a := range x.Attr {
+					switch a.Name.Local {
+					case "r":
+						for _, v := range a.Value {
+							if v >= 'A' && v <= 'Z' {
+								cellnumber = cellnumber*26 + v - 'A' + 1
+							}
+						}
+					case "t":
+						if a.Value == "s" {
+							currentCell.Type = "s"
+						} else if a.Value == "n" {
+							currentCell.Type = "n"
+						}
 
-	for xrow := 0; xrow < len(wsXlsx.Row); xrow++ {
-		thisrow := wsXlsx.Row[xrow]
+					}
 
-		currentRow = &row{}
-		currentRow.Cells = make(map[int]*cell)
-		currentRow.Num = thisrow.Rownumber
-		ws.rows[thisrow.Rownumber] = currentRow
-
-		for col := 0; col < len(thisrow.Cols); col++ {
-			var cellnumber rune
-			thiscol := thisrow.Cols[col]
-			for _, v := range thiscol.R {
-				if v >= 'A' && v <= 'Z' {
-					cellnumber = cellnumber*26 + v - 'A' + 1
+				}
+				currentRow.Cells[int(cellnumber)] = currentCell
+			}
+		case xml.EndElement:
+			switch x.Name.Local {
+			case "c":
+				currentCell = nil
+			}
+		case xml.CharData:
+			if currentCell != nil {
+				val := string(x.Copy())
+				if currentCell.Type == "s" {
+					valInt, _ := strconv.Atoi(val)
+					currentCell.Value = s.sharedStrings[valInt]
+				} else if currentCell.Type == "n" {
+					currentCell.Value = strings.TrimSuffix(val, ".0")
+				} else {
+					currentCell.Value = val
 				}
 			}
-			currentCell := &cell{}
-
-			currentRow.Cells[int(cellnumber)] = currentCell
-
-			if thiscol.T == "s" {
-				v, err := strconv.Atoi(thiscol.V)
-				if err != nil {
-					return nil, err
-				}
-				currentCell.Value = s.sharedStrings[v]
-				currentCell.Type = "s"
-			} else if thiscol.T == "" {
-				currentCell.Type = "v"
-				currentCell.Value = thiscol.V
-			}
-
 		}
 	}
+	ws.rows = rows
 	return ws, nil
 }
 
