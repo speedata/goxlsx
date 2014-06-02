@@ -6,7 +6,8 @@ import (
 )
 
 func TestOpenFile(t *testing.T) {
-	xlsx, err := OpenFile(filepath.Join("_testdata", "Worksheet1.xlsx"))
+	filename := filepath.Join("_testdata", "Worksheet1.xlsx")
+	xlsx, err := OpenFile(filename)
 	if err != nil {
 		t.Error(err)
 	}

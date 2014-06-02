@@ -52,6 +52,7 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	xlsx := new(Spreadsheet)
 	xlsx.filepath = path
 	xlsx.uncompressedFiles = make(map[string][]byte)
+	xlsx.sharedCells = make(map[string]*cell)
 
 	r, err := zip.OpenReader(path)
 	if err != nil {
@@ -160,12 +161,20 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 	ws := &Worksheet{}
 	rows := make(map[int]*row)
 
+	const (
+		CTSharedString = iota
+		CTNumber
+		CTOther
+	)
+
 	var (
-		err         error
-		token       xml.Token
-		rownum      int
-		currentCell *cell
-		currentRow  *row
+		err        error
+		token      xml.Token
+		rownum     int
+		currentRow *row
+		celltype   int
+		incell     bool
+		cellnumber rune
 	)
 	for {
 		token, err = dec.Token()
@@ -200,9 +209,12 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 				}
 				currentRow.Num = rownum
 				rows[rownum] = currentRow
+			case "v":
+				incell = true
 			case "c":
-				currentCell = &cell{}
-				var cellnumber rune
+				// currentCell = &cell{}
+				celltype = CTOther
+				cellnumber = 0
 				for _, a := range x.Attr {
 					switch a.Name.Local {
 					case "r":
@@ -213,37 +225,51 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 						}
 					case "t":
 						if a.Value == "s" {
-							currentCell.Type = "s"
+							celltype = CTSharedString
+							// currentCell.Type = "s"
 						} else if a.Value == "n" {
-							currentCell.Type = "n"
+							celltype = CTNumber
+							// currentCell.Type = "n"
 						}
-
 					}
 
 				}
-				currentRow.Cells[int(cellnumber)] = currentCell
 			}
 		case xml.EndElement:
 			switch x.Name.Local {
 			case "c":
-				currentCell = nil
+			case "v":
+				incell = false
 			}
 		case xml.CharData:
-			if currentCell != nil {
-				val := string(x.Copy())
-				if currentCell.Type == "s" {
-					valInt, _ := strconv.Atoi(val)
-					currentCell.Value = s.sharedStrings[valInt]
-				} else if currentCell.Type == "n" {
-					currentCell.Value = strings.TrimSuffix(val, ".0")
+			if incell {
+				var currentCell *cell
+
+				if celltype == CTSharedString {
+					currentCell = s.getSharedCell(string(x))
 				} else {
-					currentCell.Value = val
+					currentCell = &cell{}
+					currentCell.Value = string(x)
 				}
+				currentRow.Cells[int(cellnumber)] = currentCell
 			}
 		}
 	}
 	ws.rows = rows
 	return ws, nil
+}
+
+func (s *Spreadsheet) getSharedCell(idx string) *cell {
+	if c, ok := s.sharedCells[idx]; ok {
+		return c
+	}
+
+	valInt, _ := strconv.Atoi(idx)
+
+	c := &cell{}
+	c.Value = s.sharedStrings[valInt]
+	s.sharedCells[idx] = c
+	return c
 }
 
 // GetWorksheet returns the worksheet with the given number, starting at 0.

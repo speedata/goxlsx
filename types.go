@@ -25,7 +25,6 @@ type Worksheet struct {
 }
 
 type cell struct {
-	Name  string
 	Type  string
 	Value string
 }
@@ -42,6 +41,7 @@ type Spreadsheet struct {
 	sharedStrings     []string
 	uncompressedFiles map[string][]byte
 	relationships     map[string]relationship
+	sharedCells       map[string]*cell
 }
 
 // ------------------------------------------------------------------------
