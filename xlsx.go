@@ -11,42 +11,6 @@ import (
 	"strings"
 )
 
-// Worksheet represents a single worksheet in an excel file.
-// A worksheet is a rectangular area of cells, each cell can contain a value.
-type Worksheet struct {
-	Name        string
-	MaxRow      int
-	MaxColumn   int
-	MinRow      int
-	MinColumn   int
-	filename    string
-	id          string
-	rid         string
-	rows        map[int]*row
-	spreadsheet *Spreadsheet
-}
-
-type cell struct {
-	Name  string
-	Type  string
-	Value string
-}
-
-type row struct {
-	Num   int
-	Cells map[int]*cell
-}
-
-// Spreadsheet represents the whole .xlsx file.
-type Spreadsheet struct {
-	filepath          string
-	compressedFiles   []zip.File
-	worksheets        []*Worksheet
-	sharedStrings     []string
-	uncompressedFiles map[string][]byte
-	relationships     map[string]relationship
-}
-
 // NumWorksheets returns the number of worksheets in a file.
 func (s *Spreadsheet) NumWorksheets() int {
 	return len(s.worksheets)
@@ -127,6 +91,7 @@ func OpenFile(path string) (*Spreadsheet, error) {
 		return nil, err
 	}
 	xlsx.sharedStrings = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
+	xlsx.uncompressedFiles["xl/sharedStrings.xml"] = nil
 
 	return xlsx, nil
 }

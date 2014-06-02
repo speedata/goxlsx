@@ -4,11 +4,54 @@ import (
 	"encoding/xml"
 )
 
+type relationship struct {
+	Type   string
+	Target string
+}
+
+// Worksheet represents a single worksheet in an excel file.
+// A worksheet is a rectangular area of cells, each cell can contain a value.
+type Worksheet struct {
+	Name        string
+	MaxRow      int
+	MaxColumn   int
+	MinRow      int
+	MinColumn   int
+	filename    string
+	id          string
+	rid         string
+	rows        map[int]*row
+	spreadsheet *Spreadsheet
+}
+
+type cell struct {
+	Name  string
+	Type  string
+	Value string
+}
+
+type row struct {
+	Num   int
+	Cells map[int]*cell
+}
+
+// Spreadsheet represents the whole .xlsx file.
+type Spreadsheet struct {
+	filepath          string
+	worksheets        []*Worksheet
+	sharedStrings     []string
+	uncompressedFiles map[string][]byte
+	relationships     map[string]relationship
+}
+
+// ------------------------------------------------------------------------
+
 type sheet struct {
 	Name    string `xml:"name,attr"`
 	SheetID string `xml:"sheetId,attr"`
 	Rid     string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
 }
+
 type workbook struct {
 	XMLName xml.Name `xml:"http://schemas.openxmlformats.org/spreadsheetml/2006/main workbook"`
 	Sheets  []sheet  `xml:"sheets>sheet"`
@@ -54,9 +97,4 @@ type xslxRelationship struct {
 type xslxRelationships struct {
 	XMLName      xml.Name `xml:"http://schemas.openxmlformats.org/package/2006/relationships Relationships"`
 	Relationship []xslxRelationship
-}
-
-type relationship struct {
-	Type   string `xml:"Type,attr"`
-	Target string `xml:"Target,attr"`
 }
