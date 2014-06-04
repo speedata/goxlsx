@@ -37,14 +37,49 @@ func readWorkbook(data []byte, s *Spreadsheet) ([]*Worksheet, error) {
 	return worksheets, nil
 }
 
-func readStrings(data []byte) []string {
-	sst := &sst{}
-	xml.Unmarshal(data, sst)
-	ret := make([]string, sst.UniqueCount)
-	for i := 0; i < sst.UniqueCount; i++ {
-		ret[i] = sst.Si[i].T
+func readStrings(data []byte) ([]string, error) {
+	var (
+		err           error
+		token         xml.Token
+		sharedStrings []string
+		buf           []byte
+	)
+
+	d := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		token, err = d.Token()
+		if err != nil {
+			if err != io.EOF {
+				return nil, err
+			}
+			break
+		}
+		switch x := token.(type) {
+		case xml.StartElement:
+			switch x.Name.Local {
+			case "sst":
+				// root element
+				for i := 0; i < len(x.Attr); i++ {
+					if x.Attr[i].Name.Local == "uniqueCount" {
+						count, err := strconv.Atoi(x.Attr[i].Value)
+						if err != nil {
+							return nil, err
+						}
+						sharedStrings = make([]string, 0, count)
+					}
+				}
+			}
+		case xml.CharData:
+			buf = x.Copy()
+		case xml.EndElement:
+			switch x.Name.Local {
+			case "t":
+				sharedStrings = append(sharedStrings, string(buf))
+			}
+		}
+
 	}
-	return ret
+	return sharedStrings, nil
 }
 
 // OpenFile reads a file located at the given path and returns a spreadsheet object.
@@ -92,7 +127,10 @@ func OpenFile(path string) (*Spreadsheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	xlsx.sharedStrings = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
+	xlsx.sharedStrings, err = readStrings(xlsx.uncompressedFiles["xl/sharedStrings.xml"])
+	if err != nil {
+		return nil, err
+	}
 	xlsx.uncompressedFiles["xl/sharedStrings.xml"] = nil
 
 	return xlsx, nil
@@ -212,7 +250,6 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 			case "v":
 				incell = true
 			case "c":
-				// currentCell = &cell{}
 				celltype = CTOther
 				cellnumber = 0
 				for _, a := range x.Attr {
@@ -226,10 +263,8 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 					case "t":
 						if a.Value == "s" {
 							celltype = CTSharedString
-							// currentCell.Type = "s"
 						} else if a.Value == "n" {
 							celltype = CTNumber
-							// currentCell.Type = "n"
 						}
 					}
 
@@ -237,7 +272,6 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 			}
 		case xml.EndElement:
 			switch x.Name.Local {
-			case "c":
 			case "v":
 				incell = false
 			}

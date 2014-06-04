@@ -28,13 +28,13 @@ func TestOpenFile(t *testing.T) {
 
 	row := ws.rows[1]
 	if row.Cells[1].Value != "A" {
-		t.Error("First value should be A")
+		t.Errorf("First value should be A, but got %q", row.Cells[1].Value)
 	}
 	if row.Cells[2].Value != "B" {
-		t.Error("Second value should be B")
+		t.Errorf("Second value should be B, but is %q", row.Cells[2].Value)
 	}
 	if ws.Cell(1, 1) != "A" {
-		t.Error("1,1 should be A")
+		t.Errorf("1,1 should be A, but is %q", ws.Cell(1, 1))
 	}
 	if f, err := ws.Cellf(4, 2); f != 4.0 || err != nil {
 		t.Error("4,2 should be 4.0")
