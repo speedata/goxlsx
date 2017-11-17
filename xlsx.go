@@ -101,20 +101,12 @@ func OpenFile(path string) (*Spreadsheet, error) {
 		if err != nil {
 			return nil, err
 		}
-		pos := 0
-	readfile:
-		for {
-			size, err := rc.Read(buf[pos:])
-			if err == io.EOF {
-				// ok, fine
-				break readfile
-			} else if err != nil {
-				return nil, err
-			}
-			pos += size
+		size, err := io.ReadFull(rc, buf)
+		if err != nil {
+			return nil, err
 		}
-		if pos != int(f.UncompressedSize64) {
-			return nil, fmt.Errorf("read (%d) not equal to uncompressed size (%d)", pos, f.UncompressedSize64)
+		if size != int(f.UncompressedSize64) {
+			return nil, fmt.Errorf("read (%d) not equal to uncompressed size (%d)", size, f.UncompressedSize64)
 		}
 
 		xlsx.uncompressedFiles[f.Name] = buf

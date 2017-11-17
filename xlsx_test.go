@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+func TestLibreofficeOpen(t *testing.T) {
+	filename := filepath.Join("_testdata", "libreoffice.xlsx")
+	_, err := OpenFile(filename)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestOpenFile(t *testing.T) {
 	filename := filepath.Join("_testdata", "Worksheet1.xlsx")
 	xlsx, err := OpenFile(filename)
