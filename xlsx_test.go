@@ -30,8 +30,8 @@ func TestOpenFile(t *testing.T) {
 	if ws.filename != "xl/worksheets/sheet1.xml" {
 		t.Error("filename mismatch, got", ws.filename)
 	}
-	if len(ws.rows) != 5 {
-		t.Error("ws.rows != 5")
+	if len(ws.rows) != 6 {
+		t.Error("ws.rows != 6")
 	}
 
 	row := ws.rows[1]
@@ -46,6 +46,9 @@ func TestOpenFile(t *testing.T) {
 	}
 	if f, err := ws.Cellf(4, 2); f != 4.0 || err != nil {
 		t.Error("4,2 should be 4.0")
+	}
+	if val, expected := ws.Cell(5, 5), "a\n\nb"; val != expected {
+		t.Errorf("5,5 should be %q, but is %q", expected, val)
 	}
 
 }
