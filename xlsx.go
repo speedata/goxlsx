@@ -221,10 +221,16 @@ func (s *Spreadsheet) readWorksheet(data []byte) (*Worksheet, error) {
 			case "dimension":
 				for _, a := range x.Attr {
 					if a.Name.Local == "ref" {
-						// example: ref="A1:AC101"
+						// example: ref="A1:AC101" or (see #1) "A1" without the second part
 						tmp := strings.Split(a.Value, ":")
-						ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
-						ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+						if len(tmp) == 1 {
+							// no area, just a single cell
+							ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
+							ws.MaxColumn, ws.MaxRow = ws.MinColumn, ws.MinRow
+						} else {
+							ws.MinColumn, ws.MinRow = stringToPosition(tmp[0])
+							ws.MaxColumn, ws.MaxRow = stringToPosition(tmp[1])
+						}
 					}
 				}
 			case "row":

@@ -13,6 +13,22 @@ func TestLibreofficeOpen(t *testing.T) {
 	}
 }
 
+// Second spreadsheet is empty
+func TestEmptySpreadsheet(t *testing.T) {
+	filename := filepath.Join("_testdata", "oneempty.xlsx")
+	xlsx, err := OpenFile(filename)
+	if err != nil {
+		t.Error(err)
+	}
+	if xlsx.NumWorksheets() != 2 {
+		t.Error("num of worksheets != 2")
+	}
+	_, err = xlsx.GetWorksheet(1)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestOpenFile(t *testing.T) {
 	filename := filepath.Join("_testdata", "Worksheet1.xlsx")
 	xlsx, err := OpenFile(filename)
