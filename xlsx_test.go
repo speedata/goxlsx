@@ -3,6 +3,7 @@ package goxlsx
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLibreofficeOpen(t *testing.T) {
@@ -10,6 +11,29 @@ func TestLibreofficeOpen(t *testing.T) {
 	_, err := OpenFile(filename)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestDateTime(t *testing.T) {
+	filename := filepath.Join("_testdata", "datetime.xlsx")
+	xlsx, err := OpenFile(filename)
+	if err != nil {
+		t.Error(err)
+	}
+	ws, err := xlsx.GetWorksheet(0)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if val, expected := ws.Cell(1, 1), "43589.563194444447"; val != expected {
+		t.Errorf("1,1 should be %q, but is %q", expected, val)
+	}
+
+	if val, expectedTime := ws.Cellt(1, 1), time.Date(2019, time.May, 4, 13, 31, 0, 0, time.UTC); !val.Equal(expectedTime) {
+		t.Errorf("1,1 should be %q, but is %q", expectedTime, val)
+	}
+	if val, expectedTime := ws.Cellt(2, 1), ExcelNulltime; !val.Equal(expectedTime) {
+		t.Errorf("1,1 should be %q, but is %q", expectedTime, val)
 	}
 }
 
