@@ -42,7 +42,7 @@ Other:
 -----
 
 Status: usable<br>
-Maturity level: 3/5 (used in production, but expect changes)<br>
+Maturity level: 5/5 (used in production, API will not change)<br>
 Supported/maintained: yes<br>
 Contribution welcome: yes (pull requests, issues)<br>
 Main page: https://github.com/speedata/goxlsx<br>
