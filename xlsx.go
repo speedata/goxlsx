@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// ExcelNulltime is signalling if a time field cannot be parsed
 	ExcelNulltime time.Time
 )
 
@@ -51,7 +52,7 @@ func readStrings(data []byte) ([]string, error) {
 		err           error
 		token         xml.Token
 		sharedStrings []string
-		buf           []byte
+		buf           []string
 	)
 
 	d := xml.NewDecoder(bytes.NewReader(data))
@@ -66,8 +67,9 @@ func readStrings(data []byte) ([]string, error) {
 		switch x := token.(type) {
 		case xml.StartElement:
 			// when there is no char data, there must be an empty string for sharedStrings
-			buf = []byte{}
 			switch x.Name.Local {
+			case "si":
+				buf = []string{}
 			case "sst":
 				// root element
 				for i := 0; i < len(x.Attr); i++ {
@@ -81,11 +83,12 @@ func readStrings(data []byte) ([]string, error) {
 				}
 			}
 		case xml.CharData:
-			buf = x.Copy()
+			buf = append(buf, string(x.Copy()))
 		case xml.EndElement:
 			switch x.Name.Local {
 			case "t":
-				sharedStrings = append(sharedStrings, string(buf))
+			case "si":
+				sharedStrings = append(sharedStrings, strings.Join(buf, ""))
 			}
 		}
 
@@ -147,7 +150,7 @@ func readRelationships(data []byte) (map[string]relationship, error) {
 	}
 	ret := make(map[string]relationship)
 	for _, v := range rels.Relationship {
-		ret[v.Id] = relationship{Type: v.Type, Target: v.Target}
+		ret[v.ID] = relationship{Type: v.Type, Target: v.Target}
 	}
 	return ret, nil
 }
@@ -197,7 +200,7 @@ func (ws *Worksheet) Cellf(column, row int) (float64, error) {
 	return flt, err
 }
 
-// Return value as time. If the time cannot be parsed, it returns ExcelNullTime.
+// DateFromString return value as time. If the time cannot be parsed, it returns ExcelNullTime.
 func DateFromString(strfloat string) time.Time {
 	if strfloat == "" {
 		return ExcelNulltime
@@ -210,7 +213,7 @@ func DateFromString(strfloat string) time.Time {
 	return ExcelNulltime.Add(dur * 1000 * 1000 * 1000)
 }
 
-// Return value as time. If the time cannot be parsed, it returns ExcelNullTime.
+// Cellt returns value as time. If the time cannot be parsed, it returns ExcelNullTime.
 func (ws *Worksheet) Cellt(column, row int) time.Time {
 	return DateFromString(ws.Cell(column, row))
 }

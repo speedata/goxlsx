@@ -89,7 +89,7 @@ type xlsxWorksheet struct {
 }
 
 type xslxRelationship struct {
-	Id     string `xml:"Id,attr"`
+	ID     string `xml:"Id,attr"`
 	Type   string `xml:"Type,attr"`
 	Target string `xml:"Target,attr"`
 }

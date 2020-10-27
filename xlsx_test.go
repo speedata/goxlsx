@@ -90,5 +90,8 @@ func TestOpenFile(t *testing.T) {
 	if val, expected := ws.Cell(5, 5), "a\n\nb"; val != expected {
 		t.Errorf("5,5 should be %q, but is %q", expected, val)
 	}
+	if c := ws.Cell(2, 5); c != "Some text" {
+		t.Errorf("2,5 should be 'Some text', but is %q", c)
+	}
 
 }
